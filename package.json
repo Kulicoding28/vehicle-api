@@ -2,16 +2,20 @@
   "name": "vehicle-api-v1",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "nodemon"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
     "@prisma/client": "^5.16.1",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
     "nodemon": "^3.1.4",
     "prisma": "^5.16.1"
   }

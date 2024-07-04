@@ -9,6 +9,74 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicles VehicleModel[]
+}
+
+model VehicleBrand {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  types VehicleType[]
+}
+
+model VehicleType {
+  id        Int      @id @default(autoincrement())
+  name      String
+  brandId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brand  VehicleBrand   @relation(fields: [brandId], references: [id])
+  models VehicleModel[]
+}
+
+model VehicleModel {
+  id        Int      @id @default(autoincrement())
+  name      String
+  typeId    Int
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  type       VehicleType @relation(fields: [typeId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  priceLists PriceList[]
+}
+
+model PriceList {
+  id        Int      @id @default(autoincrement())
+  code      String
+  price     Float
+  yearId    Int
+  modelId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  year  VehicleYear  @relation(fields: [yearId], references: [id])
+  model VehicleModel @relation(fields: [modelId], references: [id])
+}
+
+model VehicleYear {
+  id        Int      @id @default(autoincrement())
+  year      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  priceLists PriceList[]
 }
