@@ -4,10 +4,12 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import vehicleRoutes from "./routes/vehicle.js";
 import { authenticateToken } from "./middleware/auth.js";
+import dotenv from "dotenv";
 import { PORT } from "./config/constant.js";
 
-const app = express();
+dotenv.config();
 
+const app = express();
 app.use(cors());
 app.use(express.json());
 
