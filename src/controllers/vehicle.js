@@ -1,29 +1,20 @@
-import { getPagination } from "../utils/pagination.js";
-import { authenticateToken } from "../middleware/auth.js";
 import prisma from "../model/index.js";
 
 export const getAllVehicles = async (req, res) => {
-  const { page, size, brand_id } = req.query;
-  const { limit, offset } = getPagination(page, size);
-
   try {
-    const condition = brand_id ? { brandId: parseInt(brand_id) } : {};
     const vehicles = await prisma.vehicleModel.findMany({
-      where: condition,
       include: {
-        pricelists: {
-          include: {
-            year: true,
-          },
-        },
         type: {
           include: {
             brand: true,
           },
         },
+        priceLists: {
+          include: {
+            year: true,
+          },
+        },
       },
-      skip: offset,
-      take: limit,
     });
 
     const formattedVehicles = vehicles.map((vehicle) => ({
@@ -39,10 +30,10 @@ export const getAllVehicles = async (req, res) => {
         vehicleYear: priceList.year.year,
       })),
     }));
-    const total = await prisma.vehicleModel.count({ where: condition });
-    res.json({ total, vehicles: formattedVehicles });
+
+    res.status(200).json(formattedVehicles);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -175,21 +166,31 @@ export const createVehicle = async (req, res) => {
 
 export const updateVehicle = async (req, res) => {
   const { id } = req.params;
-  const { vehicleBrandName, vehicleTypeName, vehicleModelName, priceList } =
-    req.body;
+  const { brandName, typeName, modelName, priceList } = req.body;
 
   try {
-    const vehicleBrand = await prisma.vehicleBrand.findFirst({
-      where: { name: vehicleBrandName },
+    // Cek keberadaan vehicle berdasarkan ID
+    const existingVehicle = await prisma.vehicleModel.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!existingVehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    // Temukan atau buat brand kendaraan
+    let vehicleBrand = await prisma.vehicleBrand.findFirst({
+      where: { name: brandName },
     });
 
     if (!vehicleBrand) {
       return res.status(400).json({ error: "Brand not found" });
     }
 
-    const vehicleType = await prisma.vehicleType.findFirst({
+    // Temukan atau buat tipe kendaraan
+    let vehicleType = await prisma.vehicleType.findFirst({
       where: {
-        name: vehicleTypeName,
+        name: typeName,
         brandId: vehicleBrand.id,
       },
     });
@@ -200,10 +201,11 @@ export const updateVehicle = async (req, res) => {
         .json({ error: "Type not found for the given brand" });
     }
 
+    // Update model kendaraan
     const vehicle = await prisma.vehicleModel.update({
       where: { id: parseInt(id) },
       data: {
-        name: vehicleModelName,
+        name: modelName,
         typeId: vehicleType.id,
       },
       include: {
@@ -223,24 +225,36 @@ export const updateVehicle = async (req, res) => {
     // Update price lists if provided
     if (priceList && priceList.length > 0) {
       for (const price of priceList) {
-        const vehicleYear = await prisma.vehicleYear.findFirst({
+        let vehicleYear = await prisma.vehicleYear.findFirst({
           where: { year: price.vehicleYear },
         });
 
         if (!vehicleYear) {
-          return res.status(400).json({ error: "Year not found" });
+          vehicleYear = await prisma.vehicleYear.create({
+            data: { year: price.vehicleYear },
+          });
         }
 
-        await prisma.priceList.updateMany({
+        await prisma.priceList.upsert({
           where: {
-            modelId: vehicle.id,
-            yearId: vehicleYear.id,
+            modelId_yearId: {
+              modelId: vehicle.id,
+              yearId: vehicleYear.id,
+            },
           },
-          data: { price: price.price },
+          update: {
+            price: price.price,
+          },
+          create: {
+            price: price.price,
+            yearId: vehicleYear.id,
+            modelId: vehicle.id,
+          },
         });
       }
     }
 
+    // Format response
     const formattedVehicle = {
       id: vehicle.id,
       name: vehicle.name,
@@ -263,11 +277,17 @@ export const updateVehicle = async (req, res) => {
 
 export const deleteVehicle = async (req, res) => {
   const { id } = req.params;
+
   try {
-    const vehicle = await prisma.vehicleModel.delete({
+    await prisma.priceList.deleteMany({
+      where: { modelId: parseInt(id) },
+    });
+
+    await prisma.vehicleModel.delete({
       where: { id: parseInt(id) },
     });
-    res.json(vehicle);
+
+    res.json({ message: "Vehicle successfully removed" });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
